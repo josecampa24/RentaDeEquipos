@@ -36,16 +36,17 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import api from '../utils/api'
+import { supabase } from '../utils/supabase'
 
 const equipments = ref([])
 
 onMounted(async () => {
   try {
-    const res = await api.get('/equipments')
-    equipments.value = res.data
+    const { data, error } = await supabase.from('equipments').select('*')
+    if (error) throw error
+    equipments.value = data
   } catch (error) {
-    console.error(error)
+    console.error('Error fetching equipments:', error)
   }
 })
 </script>
