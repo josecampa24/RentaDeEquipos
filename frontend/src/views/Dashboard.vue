@@ -24,16 +24,21 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
-import api from '../utils/api'
+import { supabase } from '../utils/supabase'
 
 const stats = ref({ activeRentals: 0, pendingReturns: 0, maintenanceEquip: 0, currentMonthIncome: 0 })
 
 onMounted(async () => {
   try {
-    const res = await api.get('/dashboard')
-    stats.value = res.data
+    // Queries básicos usando Supabase
+    const { count: activeRentals } = await supabase.from('rentals').select('*', { count: 'exact', head: true }).in('status', ['PENDIENTE', 'CONFIRMADA'])
+    const { count: maintenanceEquip } = await supabase.from('equipments').select('*', { count: 'exact', head: true }).eq('status', 'MANTENIMIENTO')
+    
+    stats.value.activeRentals = activeRentals || 0
+    stats.value.maintenanceEquip = maintenanceEquip || 0
+    // pendingReturns y currentMonthIncome se pueden calcular sumando campos de los resultados en futuros updates
   } catch (error) {
-    console.error(error)
+    console.error('Error cargando stats de Supabase:', error)
   }
 })
 </script>
