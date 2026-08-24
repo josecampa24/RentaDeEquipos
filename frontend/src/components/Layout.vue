@@ -7,8 +7,7 @@
         <router-link to="/" class="block px-4 py-2 rounded transition-colors hover:bg-gray-800" active-class="bg-gray-800 text-white">Dashboard</router-link>
         <router-link to="/equipments" class="block px-4 py-2 rounded transition-colors hover:bg-gray-800" active-class="bg-gray-800 text-white">Equipos</router-link>
         <router-link to="/clients" class="block px-4 py-2 rounded transition-colors hover:bg-gray-800" active-class="bg-gray-800 text-white">Clientes</router-link>
-        <router-link to="/rentals" class="block px-4 py-2 rounded transition-colors hover:bg-gray-800" active-class="bg-gray-800 text-white">Rentas</router-link>
-        <router-link to="/returns" class="block px-4 py-2 rounded transition-colors hover:bg-gray-800" active-class="bg-gray-800 text-white">Devoluciones</router-link>
+        <router-link to="/returns" class="block px-4 py-2 rounded transition-colors hover:bg-gray-800" active-class="bg-gray-800 text-white">Rentas y Devoluciones</router-link>
       </nav>
       <div class="p-4 border-t border-gray-800">
         <button @click="logout" class="w-full py-2 bg-red-600 hover:bg-red-700 rounded text-white font-medium transition-colors">Cerrar Sesión</button>

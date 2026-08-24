@@ -30,13 +30,29 @@ const stats = ref({ activeRentals: 0, pendingReturns: 0, maintenanceEquip: 0, cu
 
 onMounted(async () => {
   try {
-    // Queries básicos usando Supabase
-    const { count: activeRentals } = await supabase.from('rentals').select('*', { count: 'exact', head: true }).in('status', ['PENDIENTE', 'CONFIRMADA'])
+    const { data: rentals } = await supabase.from('rentals').select('*')
     const { count: maintenanceEquip } = await supabase.from('equipments').select('*', { count: 'exact', head: true }).eq('status', 'MANTENIMIENTO')
     
-    stats.value.activeRentals = activeRentals || 0
+    if (rentals) {
+      stats.value.activeRentals = rentals.filter(r => r.status === 'CONFIRMADA' || r.status === 'PENDIENTE').length
+      
+      // Devoluciones pendientes son rentas activas cuya fecha final ya pasó
+      stats.value.pendingReturns = rentals.filter(r => {
+        if (r.status !== 'CONFIRMADA') return false
+        const end = new Date(r.end_date)
+        end.setHours(23, 59, 59, 999)
+        return new Date() > end
+      }).length
+      
+      // Ingresos del mes
+      const currentMonth = new Date().getMonth()
+      const currentYear = new Date().getFullYear()
+      stats.value.currentMonthIncome = rentals
+        .filter(r => new Date(r.start_date).getMonth() === currentMonth && new Date(r.start_date).getFullYear() === currentYear)
+        .reduce((sum, r) => sum + Number(r.total_price), 0)
+    }
+    
     stats.value.maintenanceEquip = maintenanceEquip || 0
-    // pendingReturns y currentMonthIncome se pueden calcular sumando campos de los resultados en futuros updates
   } catch (error) {
     console.error('Error cargando stats de Supabase:', error)
   }
