@@ -1,213 +1,473 @@
+
 <template>
-  <div>
-    <div class="flex justify-between items-center mb-6">
-      <h1 class="text-3xl font-bold text-gray-900">Rentas y Devoluciones</h1>
-      <button @click="openNewRentalModal" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded shadow transition-colors">+ Nueva Renta</button>
-    </div>
+  <div class="space-y-8">
+    <!-- Encabezado -->
+    <header class="flex items-center justify-between gap-3">
+      <h1 class="text-3xl font-bold text-gray-900">
+        Rentas y Devoluciones
+      </h1>
 
-    <!-- Rentas activas (Pendientes de Devolución) -->
-    <div class="bg-white shadow rounded-lg overflow-hidden">
-      <div class="px-6 py-4 border-b border-gray-200">
-        <h2 class="text-xl font-medium text-gray-800">Rentas Activas</h2>
-      </div>
-      <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
+      <button
+        @click="openNewRentalModal"
+        class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded"
+      >
+        + Nueva Renta
+      </button>
+    </header>
+
+    <p
+      v-if="loadError"
+      role="alert"
+      class="p-3 bg-red-50 text-red-700 rounded"
+    >
+      {{ loadError }}
+    </p>
+
+    <!-- RENTAS ACTIVAS -->
+    <section class="bg-white shadow rounded-lg overflow-x-auto">
+      <h2 class="text-xl font-semibold p-5 border-b">
+        Rentas activas
+      </h2>
+
+      <table class="min-w-full text-sm">
+        <thead class="bg-gray-50 text-left text-gray-600">
           <tr>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID / Cliente</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Equipos Rentados</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fechas</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Acción</th>
+            <th class="p-4">Cliente / ID</th>
+            <th class="p-4">Equipos</th>
+            <th class="p-4">Fechas</th>
+            <th class="p-4">Total</th>
+            <th class="p-4">Acción</th>
           </tr>
         </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
-          <tr v-for="rental in pendingRentals" :key="rental.id" class="hover:bg-gray-50 transition-colors">
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-              <div class="font-bold">#{{ rental.id }}</div>
-              <div class="text-gray-500">{{ rental.clients?.name || 'Desconocido' }}</div>
-            </td>
-            <td class="px-6 py-4 text-sm text-gray-700">
-              <ul class="list-disc pl-4 space-y-1">
-                <li v-for="item in rental.rental_items" :key="item.id">
-                  <span class="font-semibold">{{ item.quantity }}x</span> {{ item.equipments?.name || 'Equipo eliminado' }}
-                </li>
-              </ul>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500" :class="{'text-red-600 font-bold': isOverdue(rental.end_date)}">
-              {{ formatDate(rental.start_date) }} - {{ formatDate(rental.end_date) }}
-              <span v-if="isOverdue(rental.end_date)" class="ml-2 text-xs bg-red-100 text-red-800 px-2 py-1 rounded-full block mt-1 w-fit">Atrasado</span>
-            </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">${{ rental.total_price }}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm">
-              <button @click="openReturnModal(rental)" class="text-indigo-600 hover:text-indigo-900 bg-indigo-50 hover:bg-indigo-100 px-3 py-1 rounded-md transition-colors font-medium">Procesar Devolución</button>
-            </td>
-          </tr>
-          <tr v-if="pendingRentals.length === 0">
-            <td colspan="5" class="px-6 py-4 text-center text-gray-500 py-8">No hay rentas activas en este momento.</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
 
-    <!-- Historial de rentas completadas -->
-    <div class="mt-8 bg-white shadow rounded-lg overflow-hidden">
-      <div class="px-6 py-4 border-b border-gray-200">
-        <h2 class="text-xl font-medium text-gray-800">Historial (Rentas Completadas)</h2>
-      </div>
-      <table class="min-w-full divide-y divide-gray-200">
-        <thead class="bg-gray-50">
-          <tr>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID / Cliente</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Equipos Rentados</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha Devolución</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Condición</th>
-            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Pagado</th>
-          </tr>
-        </thead>
-        <tbody class="bg-white divide-y divide-gray-200">
-          <tr v-for="ret in recentReturns" :key="ret.id" class="hover:bg-gray-50 transition-colors">
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-              <div class="font-bold">#{{ ret.rental_id }}</div>
-              <div class="text-gray-500">{{ ret.rentals?.clients?.name || 'Desconocido' }}</div>
+        <tbody class="divide-y">
+          <tr
+            v-for="rental in pendingRentals"
+            :key="rental.id"
+          >
+            <td class="p-4">
+              <strong>
+                {{ rental.clients?.name || 'Sin cliente' }}
+              </strong>
+
+              <div class="text-xs text-gray-500">
+                {{ rental.id }}
+              </div>
             </td>
-            <td class="px-6 py-4 text-sm text-gray-700">
-              <ul class="list-disc pl-4 space-y-1">
-                <li v-for="item in ret.rentals?.rental_items" :key="item.id">
-                  <span class="font-semibold">{{ item.quantity }}x</span> {{ item.equipments?.name || 'Equipo eliminado' }}
-                </li>
-              </ul>
+
+            <td class="p-4">
+              <div
+                v-for="item in rental.rental_items || []"
+                :key="item.id"
+              >
+                {{ item.quantity }} ×
+                {{ item.equipments?.name || 'Equipo' }}
+              </div>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{{ formatDateTime(ret.return_date) }}</td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm">
-              <span :class="getConditionClass(ret.condition)" class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full">
-                {{ ret.condition }}
+
+            <td
+              class="p-4"
+              :class="isOverdue(rental.end_date)
+                ? 'text-red-600 font-semibold'
+                : ''"
+            >
+              {{ rental.start_date }} →
+              {{ rental.end_date }}
+
+              <span
+                v-if="isOverdue(rental.end_date)"
+                class="block"
+              >
+                Atrasado
               </span>
-              <div class="text-xs text-gray-400 mt-1 truncate max-w-[200px]" v-if="ret.comments">{{ ret.comments }}</div>
             </td>
-            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-semibold">${{ ret.rentals?.total_price || 0 }}</td>
+
+            <td class="p-4">
+              {{ money(rental.total_price) }}
+            </td>
+
+            <td class="p-4">
+              <button
+                @click="openReturnModal(rental)"
+                class="text-indigo-700 bg-indigo-50 px-3 py-2 rounded"
+              >
+                Procesar devolución
+              </button>
+            </td>
           </tr>
-          <tr v-if="recentReturns.length === 0">
-            <td colspan="5" class="px-6 py-4 text-center text-gray-500 py-8">Aún no hay historial de devoluciones.</td>
+
+          <tr v-if="!pendingRentals.length">
+            <td
+              colspan="5"
+              class="p-8 text-center text-gray-500"
+            >
+              No hay rentas activas.
+            </td>
           </tr>
         </tbody>
       </table>
-    </div>
+    </section>
 
-    <!-- Modal Procesar Devolución -->
-    <div v-if="showReturnModal" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
-        <h2 class="text-xl font-bold mb-4 text-gray-800">Procesar Devolución - Renta #{{ selectedRental?.id }}</h2>
-        <form @submit.prevent="processReturn" class="space-y-4">
-          
+    <!-- HISTORIAL -->
+    <section class="bg-white shadow rounded-lg overflow-x-auto">
+      <h2 class="text-xl font-semibold p-5 border-b">
+        Historial de devoluciones (últimas 50)
+      </h2>
+
+      <table class="min-w-full text-sm">
+        <thead class="bg-gray-50 text-left text-gray-600">
+          <tr>
+            <th class="p-4">Cliente</th>
+            <th class="p-4">Equipos</th>
+            <th class="p-4">Fecha</th>
+            <th class="p-4">Condición</th>
+            <th class="p-4">Total de renta</th>
+          </tr>
+        </thead>
+
+        <tbody class="divide-y">
+          <tr
+            v-for="ret in recentReturns"
+            :key="ret.id"
+          >
+            <td class="p-4">
+              {{ ret.rentals?.clients?.name || 'Sin cliente' }}
+            </td>
+
+            <td class="p-4">
+              <div
+                v-for="item in ret.rentals?.rental_items || []"
+                :key="item.id"
+              >
+                {{ item.quantity }} ×
+                {{ item.equipments?.name }}
+              </div>
+            </td>
+
+            <td class="p-4">
+              {{ new Date(ret.return_date).toLocaleString('es-MX') }}
+            </td>
+
+            <td class="p-4">
+              {{ ret.condition }}
+
+              <div
+                v-if="ret.comments"
+                class="text-xs text-gray-500"
+              >
+                {{ ret.comments }}
+              </div>
+            </td>
+
+            <td class="p-4">
+              {{ money(ret.rentals?.total_price) }}
+            </td>
+          </tr>
+
+          <tr v-if="!recentReturns.length">
+            <td
+              colspan="5"
+              class="p-8 text-center text-gray-500"
+            >
+              Sin devoluciones registradas.
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- MODAL NUEVA RENTA -->
+    <div
+      v-if="showNewRentalModal"
+      class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+    >
+      <div
+        class="bg-white w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg p-6 shadow-xl"
+      >
+        <h2 class="text-xl font-bold mb-4">
+          Registrar nueva renta
+        </h2>
+
+        <form
+          @submit.prevent="saveRental"
+          class="space-y-4"
+        >
+          <!-- Cliente -->
           <div>
-            <label class="block text-sm font-medium text-gray-700">Condición del Equipo</label>
-            <select v-model="returnForm.condition" required class="mt-1 block w-full rounded border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2 border">
-              <option value="BUENA">Buena (Sin daños aparentes)</option>
-              <option value="DAÑADA">Dañada (Requiere reparación)</option>
-              <option value="PERDIDA">Perdida / Incompleta</option>
+            <label class="block text-sm font-medium">
+              Cliente
+            </label>
+
+            <select
+              v-model="rentalForm.client_id"
+              required
+              class="w-full mt-1 border rounded p-2"
+            >
+              <option value="" disabled>
+                Selecciona un cliente
+              </option>
+
+              <option
+                v-for="client in allClients"
+                :key="client.id"
+                :value="client.id"
+              >
+                {{ client.name }}
+              </option>
             </select>
           </div>
 
-          <div>
-            <label class="block text-sm font-medium text-gray-700">Comentarios Adicionales</label>
-            <textarea v-model="returnForm.comments" rows="3" class="mt-1 block w-full rounded border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2 border" placeholder="Observaciones de la devolución..."></textarea>
+          <!-- Fechas -->
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-sm font-medium">
+                Fecha de inicio
+              </label>
+
+              <input
+                v-model="rentalForm.start_date"
+                type="date"
+                required
+                class="w-full mt-1 border rounded p-2"
+              />
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium">
+                Fecha de fin
+              </label>
+
+              <input
+                v-model="rentalForm.end_date"
+                type="date"
+                :min="rentalForm.start_date"
+                required
+                class="w-full mt-1 border rounded p-2"
+              />
+            </div>
           </div>
-          
-          <div class="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-100">
-            <button type="button" @click="closeReturnModal" class="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded transition-colors">Cancelar</button>
-            <button type="submit" :disabled="isSavingReturn" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors disabled:opacity-50">
-              {{ isSavingReturn ? 'Procesando...' : 'Confirmar Devolución' }}
+
+          <!-- Equipos -->
+          <div class="space-y-3 border-t pt-4">
+            <h3 class="font-semibold">
+              Equipos de la renta
+            </h3>
+
+            <div
+              v-for="(item, index) in rentalForm.items"
+              :key="index"
+              class="flex gap-2 items-end"
+            >
+              <div class="flex-1">
+                <label class="block text-sm">
+                  Equipo
+                </label>
+
+                <select
+                  v-model="item.equipment_id"
+                  required
+                  class="w-full mt-1 border rounded p-2"
+                >
+                  <option value="" disabled>
+                    Selecciona equipo
+                  </option>
+
+                  <option
+                    v-for="eq in allEquipments.filter(
+                      e => e.status !== 'INACTIVO' &&
+                           e.status !== 'MANTENIMIENTO'
+                    )"
+                    :key="eq.id"
+                    :value="eq.id"
+                    :disabled="rentalForm.items.some(
+                      (it, i) =>
+                        i !== index &&
+                        it.equipment_id === eq.id
+                    )"
+                  >
+                    {{ eq.name }}
+                    ({{ eq.quantity }} disponibles,
+                    {{ money(eq.dailyPrice) }}/día)
+                  </option>
+                </select>
+              </div>
+
+              <div class="w-24">
+                <label class="block text-sm">
+                  Cantidad
+                </label>
+
+                <input
+                  v-model.number="item.quantity"
+                  type="number"
+                  min="1"
+                  step="1"
+                  required
+                  class="w-full mt-1 border rounded p-2"
+                />
+              </div>
+
+              <button
+                type="button"
+                @click="removeItem(index)"
+                :disabled="rentalForm.items.length === 1"
+                class="text-red-600 p-2 disabled:opacity-40"
+              >
+                Quitar
+              </button>
+            </div>
+
+            <button
+              type="button"
+              @click="addItem"
+              class="text-indigo-700 font-medium"
+            >
+              + Agregar otro equipo
+            </button>
+          </div>
+
+          <!-- Total -->
+          <div class="text-right font-bold">
+            {{ rentalDays }} día(s) —
+            Total estimado: {{ money(calculatedTotal) }}
+          </div>
+
+          <p
+            v-if="rentalError"
+            role="alert"
+            class="bg-red-50 text-red-700 p-3 rounded"
+          >
+            {{ rentalError }}
+          </p>
+
+          <div class="flex justify-end gap-3 border-t pt-4">
+            <button
+              type="button"
+              @click="showNewRentalModal = false"
+              :disabled="isSavingRental"
+              class="p-2"
+            >
+              Cancelar
+            </button>
+
+            <button
+              type="submit"
+              :disabled="isSavingRental"
+              class="bg-indigo-600 text-white rounded px-4 py-2 disabled:opacity-50"
+            >
+              {{ isSavingRental ? 'Guardando...' : 'Guardar renta' }}
             </button>
           </div>
         </form>
       </div>
     </div>
-    
-    <!-- Modal Nueva Renta -->
-    <div v-if="showNewRentalModal" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
-        <h2 class="text-xl font-bold mb-4 text-gray-800">Registrar Nueva Renta</h2>
-        <form @submit.prevent="saveRental" class="space-y-4">
-          
+
+    <!-- MODAL DEVOLUCIÓN -->
+    <div
+      v-if="showReturnModal"
+      class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+    >
+      <div class="bg-white w-full max-w-md rounded-lg p-6 shadow-xl">
+        <h2 class="text-xl font-bold mb-2">
+          Devolución de {{ selectedRental?.clients?.name }}
+        </h2>
+
+        <p class="text-sm text-gray-600 mb-4">
+          Esta operación devuelve la renta completa.
+          La condición elegida se aplica a todos sus equipos.
+        </p>
+
+        <form
+          @submit.prevent="processReturn"
+          class="space-y-4"
+        >
           <div>
-            <label class="block text-sm font-medium text-gray-700">Cliente</label>
-            <select v-model="rentalForm.client_id" required class="mt-1 block w-full rounded border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2 border">
-              <option value="" disabled>Selecciona un cliente</option>
-              <option v-for="client in allClients" :key="client.id" :value="client.id">{{ client.name }}</option>
+            <label class="block text-sm font-medium">
+              Condición de los equipos
+            </label>
+
+            <select
+              v-model="returnForm.condition"
+              required
+              class="w-full border p-2 rounded mt-1"
+            >
+              <option value="BUENA">
+                BUENA — vuelve al inventario
+              </option>
+
+              <option value="DAÑADA">
+                DAÑADA — no vuelve al disponible
+              </option>
+
+              <option value="PERDIDA">
+                PERDIDA — no vuelve al disponible
+              </option>
             </select>
           </div>
 
-          <div class="grid grid-cols-2 gap-4">
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Fecha de Inicio</label>
-              <input type="date" v-model="rentalForm.start_date" required class="mt-1 block w-full rounded border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2 border" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium text-gray-700">Fecha de Fin</label>
-              <input type="date" v-model="rentalForm.end_date" required class="mt-1 block w-full rounded border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2 border" />
-            </div>
+          <div>
+            <label class="block text-sm font-medium">
+              Observaciones
+            </label>
+
+            <textarea
+              v-model="returnForm.comments"
+              rows="3"
+              class="w-full border rounded p-2 mt-1"
+            ></textarea>
           </div>
 
-          <div class="border-t border-gray-200 pt-4 mt-4">
-            <h3 class="text-lg font-medium text-gray-900 mb-2">Equipos</h3>
-            
-            <div v-for="(item, index) in rentalForm.items" :key="index" class="flex gap-4 mb-2 items-end">
-              <div class="flex-1">
-                <label class="block text-xs font-medium text-gray-700">Equipo</label>
-                <select v-model="item.equipment_id" required @change="updateItemPrice(index)" class="mt-1 block w-full rounded border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2 border text-sm">
-                  <option value="" disabled>Selecciona equipo</option>
-                  <option v-for="eq in allEquipments" :key="eq.id" :value="eq.id">{{ eq.name }} (${{ eq.dailyPrice }}/día)</option>
-                </select>
-              </div>
-              <div class="w-24">
-                <label class="block text-xs font-medium text-gray-700">Cantidad</label>
-                <input type="number" v-model.number="item.quantity" min="1" required class="mt-1 block w-full rounded border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2 border text-sm" />
-              </div>
-              <button type="button" @click="removeItem(index)" class="text-red-500 hover:text-red-700 p-2 mb-1">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
-              </button>
-            </div>
-            
-            <button type="button" @click="addItem" class="mt-2 text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ Agregar otro equipo</button>
-          </div>
-          
-          <div class="flex justify-between items-center mt-6 pt-4 border-t border-gray-100">
-            <div class="text-lg font-bold text-gray-900">
-              Total estimado: ${{ calculatedTotal.toFixed(2) }}
-            </div>
-            <div class="flex space-x-3">
-              <button type="button" @click="closeNewRentalModal" class="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded transition-colors">Cancelar</button>
-              <button type="submit" :disabled="isSavingRental || rentalForm.items.length === 0" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors disabled:opacity-50">
-                {{ isSavingRental ? 'Guardando...' : 'Guardar Renta' }}
-              </button>
-            </div>
+          <p
+            v-if="returnError"
+            role="alert"
+            class="text-red-700 bg-red-50 p-3 rounded"
+          >
+            {{ returnError }}
+          </p>
+
+          <div class="flex justify-end gap-3">
+            <button
+              type="button"
+              @click="showReturnModal = false"
+              :disabled="isSavingReturn"
+            >
+              Cancelar
+            </button>
+
+            <button
+              type="submit"
+              :disabled="isSavingReturn"
+              class="bg-indigo-600 text-white px-4 py-2 rounded disabled:opacity-50"
+            >
+              {{ isSavingReturn ? 'Procesando...' : 'Confirmar devolución' }}
+            </button>
           </div>
         </form>
       </div>
     </div>
-
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { supabase } from '../utils/supabase'
 
+// Estados
 const pendingRentals = ref([])
 const recentReturns = ref([])
-const showReturnModal = ref(false)
-const showNewRentalModal = ref(false)
-const isSavingReturn = ref(false)
-const isSavingRental = ref(false)
-const selectedRental = ref(null)
-
 const allClients = ref([])
 const allEquipments = ref([])
 
-const returnForm = ref({
-  condition: 'BUENA',
-  comments: ''
-})
+const loadError = ref('')
+const rentalError = ref('')
+const returnError = ref('')
+
+const isSavingRental = ref(false)
+const isSavingReturn = ref(false)
+
+const showNewRentalModal = ref(false)
+const showReturnModal = ref(false)
+const selectedRental = ref(null)
 
 const rentalForm = ref({
   client_id: '',
@@ -216,208 +476,311 @@ const rentalForm = ref({
   items: []
 })
 
-const fetchData = async () => {
-  try {
-    // Fetch rentas activas
-    const { data: rentals, error: rentalsError } = await supabase
-      .from('rentals')
-      .select('*, clients(name), rental_items(*, equipments(name))')
-      .eq('status', 'CONFIRMADA')
-      .order('end_date', { ascending: true })
-      
-    if (rentalsError) console.error('Error fetching rentals:', rentalsError)
-    if (rentals) pendingRentals.value = rentals
-    
-    // Fetch returns history nested info
-    const { data: returns, error: returnsError } = await supabase
-      .from('returns')
-      .select('*, rentals(*, clients(name), rental_items(*, equipments(name)))')
-      .order('return_date', { ascending: false })
-      .limit(10)
-      
-    if (returnsError) console.error('Error fetching returns:', returnsError)
-    if (returns) recentReturns.value = returns
-      
-    // Fetch para el modal de nueva renta
-    const { data: cData } = await supabase.from('clients').select('*')
-    if (cData) allClients.value = cData
-    
-    const { data: eData } = await supabase.from('equipments').select('*')
-    if (eData) allEquipments.value = eData
-      
-  } catch (error) {
-    console.error('Error fetching return data:', error)
+const returnForm = ref({
+  condition: 'BUENA',
+  comments: ''
+})
+
+// Formato de dinero
+const money = value =>
+  new Intl.NumberFormat('es-MX', {
+    style: 'currency',
+    currency: 'MXN'
+  }).format(Number(value) || 0)
+
+// Fecha local
+const today = () => {
+  const d = new Date()
+
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+// Sumar días
+const addDays = (date, days) => {
+  const d = new Date(`${date}T12:00:00`)
+  d.setDate(d.getDate() + days)
+
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+// Renta atrasada
+const isOverdue = date =>
+  Boolean(date && date < today())
+
+// Días de renta
+const rentalDays = computed(() => {
+  const { start_date, end_date } = rentalForm.value
+
+  if (!start_date || !end_date || end_date < start_date) {
+    return 0
   }
-}
 
-// Lógica de Devoluciones
-const openReturnModal = (rental) => {
-  selectedRental.value = rental
-  returnForm.value = { condition: 'BUENA', comments: '' }
-  showReturnModal.value = true
-}
+  const diff = (
+    Date.parse(`${end_date}T12:00:00Z`) -
+    Date.parse(`${start_date}T12:00:00Z`)
+  ) / 86400000
 
-const closeReturnModal = () => {
-  showReturnModal.value = false
-  selectedRental.value = null
-}
+  return Math.max(1, Math.round(diff))
+})
 
-const processReturn = async () => {
-  if (!selectedRental.value) return
-  isSavingReturn.value = true
-  
+// Total automático
+const calculatedTotal = computed(() =>
+  rentalDays.value * rentalForm.value.items.reduce(
+    (sum, item) => {
+      const eq = allEquipments.value.find(
+        x => x.id === item.equipment_id
+      )
+
+      return sum +
+        (Number(eq?.dailyPrice) || 0) *
+        (Number(item.quantity) || 0)
+    },
+    0
+  )
+)
+
+// Consultar información
+async function fetchData() {
+  loadError.value = ''
+
   try {
-    const { error: returnError } = await supabase.from('returns').insert([{
-      rental_id: selectedRental.value.id,
-      return_date: new Date().toISOString(),
-      condition: returnForm.value.condition,
-      comments: returnForm.value.comments
-    }])
-    
-    if (returnError) throw returnError
-    
-    const { error: updateError } = await supabase
-      .from('rentals')
-      .update({ status: 'COMPLETADA' })
-      .eq('id', selectedRental.value.id)
-      
-    if (updateError) throw updateError
-    
-    if (selectedRental.value.rental_items) {
-      for (const item of selectedRental.value.rental_items) {
-        const { data: eqData } = await supabase.from('equipments').select('quantity').eq('id', item.equipment_id).single()
-        if (eqData) {
-          await supabase.from('equipments').update({ quantity: eqData.quantity + item.quantity }).eq('id', item.equipment_id)
-        }
-      }
+    const [
+      rentals,
+      returns,
+      clients,
+      equipments
+    ] = await Promise.all([
+      supabase
+        .from('rentals')
+        .select(
+          '*, clients(name), rental_items(*, equipments(name))'
+        )
+        .in('status', ['ACTIVA', 'CONFIRMADA'])
+        .order('end_date'),
+
+      supabase
+        .from('returns')
+        .select(
+          '*, rentals(*, clients(name), rental_items(*, equipments(name)))'
+        )
+        .order('return_date', { ascending: false })
+        .limit(50),
+
+      supabase
+        .from('clients')
+        .select('id, name')
+        .order('name'),
+
+      supabase
+        .from('equipments')
+        .select('id, name, quantity, dailyPrice, status')
+        .order('name')
+    ])
+
+    for (const result of [
+      rentals,
+      returns,
+      clients,
+      equipments
+    ]) {
+      if (result.error) throw result.error
     }
-    
-    await fetchData()
-    closeReturnModal()
-    
-  } catch (error) {
-    console.error('Error procesando devolución:', error)
-    alert('Hubo un error al procesar: ' + error.message)
-  } finally {
-    isSavingReturn.value = false
+
+    pendingRentals.value = rentals.data || []
+    recentReturns.value = returns.data || []
+    allClients.value = clients.data || []
+    allEquipments.value = equipments.data || []
+
+  } catch (err) {
+    loadError.value =
+      `No se pudo cargar la información: ${err.message}`
   }
 }
 
-// Lógica de Nueva Renta
-const openNewRentalModal = () => {
+// Abrir nueva renta
+function openNewRentalModal() {
   rentalForm.value = {
     client_id: '',
-    start_date: new Date().toISOString().split('T')[0],
-    end_date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
-    items: [{ equipment_id: '', quantity: 1, price: 0 }]
+    start_date: today(),
+    end_date: addDays(today(), 1),
+    items: [
+      {
+        equipment_id: '',
+        quantity: 1
+      }
+    ]
   }
+
+  rentalError.value = ''
   showNewRentalModal.value = true
 }
 
-const closeNewRentalModal = () => {
-  showNewRentalModal.value = false
+// Agregar equipo
+function addItem() {
+  rentalForm.value.items.push({
+    equipment_id: '',
+    quantity: 1
+  })
 }
 
-const addItem = () => {
-  rentalForm.value.items.push({ equipment_id: '', quantity: 1, price: 0 })
-}
-
-const removeItem = (index) => {
-  rentalForm.value.items.splice(index, 1)
-}
-
-const updateItemPrice = (index) => {
-  const item = rentalForm.value.items[index]
-  const eq = allEquipments.value.find(e => e.id === item.equipment_id)
-  if (eq) {
-    item.price = eq.dailyPrice
+// Quitar equipo
+function removeItem(index) {
+  if (rentalForm.value.items.length > 1) {
+    rentalForm.value.items.splice(index, 1)
   }
 }
 
-const calculatedTotal = computed(() => {
-  if (!rentalForm.value.start_date || !rentalForm.value.end_date) return 0
-  const start = new Date(rentalForm.value.start_date)
-  const end = new Date(rentalForm.value.end_date)
-  const diffTime = Math.abs(end - start)
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1
-  
-  let itemsTotal = rentalForm.value.items.reduce((total, item) => total + (item.price * item.quantity), 0)
-  return itemsTotal * diffDays
-})
+// Validar nueva renta
+function validateRental() {
+  const f = rentalForm.value
 
-const saveRental = async () => {
-  isSavingRental.value = true
-  try {
-    const { data: rentalData, error: rentalError } = await supabase.from('rentals').insert([{
-      client_id: rentalForm.value.client_id,
-      start_date: rentalForm.value.start_date,
-      end_date: rentalForm.value.end_date,
-      total_price: calculatedTotal.value,
-      status: 'CONFIRMADA'
-    }]).select()
-    
-    if (rentalError) throw rentalError
-    
-    const rentalId = rentalData[0].id
-    
-    const itemsToInsert = rentalForm.value.items.map(item => ({
-      rental_id: rentalId,
-      equipment_id: item.equipment_id,
-      quantity: item.quantity,
-      price: item.price
-    }))
-    
-    const { error: itemsError } = await supabase.from('rental_items').insert(itemsToInsert)
-    if (itemsError) throw itemsError
-    
-    for (const item of rentalForm.value.items) {
-      const eq = allEquipments.value.find(e => e.id === item.equipment_id)
-      if (eq) {
-        const newQuantity = Math.max(0, eq.quantity - item.quantity)
-        await supabase.from('equipments').update({ quantity: newQuantity }).eq('id', eq.id)
-      }
+  if (!f.client_id) {
+    return 'Selecciona un cliente.'
+  }
+
+  if (
+    !f.start_date ||
+    !f.end_date ||
+    rentalDays.value < 1
+  ) {
+    return 'La fecha final no puede ser anterior a la inicial.'
+  }
+
+  if (!f.items.length) {
+    return 'Agrega al menos un equipo.'
+  }
+
+  const ids = new Set()
+
+  for (const item of f.items) {
+    if (!item.equipment_id) {
+      return 'Selecciona un equipo en cada fila.'
     }
-    
+
+    if (ids.has(item.equipment_id)) {
+      return 'No puedes agregar el mismo equipo dos veces.'
+    }
+
+    ids.add(item.equipment_id)
+
+    if (
+      !Number.isSafeInteger(item.quantity) ||
+      item.quantity < 1
+    ) {
+      return 'La cantidad debe ser un entero positivo.'
+    }
+
+    const eq = allEquipments.value.find(
+      x => x.id === item.equipment_id
+    )
+
+    if (!eq) {
+      return 'Uno de los equipos ya no está disponible.'
+    }
+
+    if (
+      ['INACTIVO', 'MANTENIMIENTO'].includes(eq.status)
+    ) {
+      return `El equipo ${eq.name} no está habilitado.`
+    }
+
+    if (item.quantity > Number(eq.quantity)) {
+      return `Solo quedan ${eq.quantity} unidades de ${eq.name}.`
+    }
+  }
+
+  return ''
+}
+
+// Guardar nueva renta
+async function saveRental() {
+  if (isSavingRental.value) return
+
+  rentalError.value = validateRental()
+
+  if (rentalError.value) return
+
+  isSavingRental.value = true
+
+  try {
+    const { error } = await supabase.rpc(
+      'create_rental_safe',
+      {
+        p_client_id: rentalForm.value.client_id,
+        p_start_date: rentalForm.value.start_date,
+        p_end_date: rentalForm.value.end_date,
+        p_items: rentalForm.value.items.map(x => ({
+          equipment_id: x.equipment_id,
+          quantity: x.quantity
+        }))
+      }
+    )
+
+    if (error) throw error
+
+    showNewRentalModal.value = false
+
     await fetchData()
-    closeNewRentalModal()
-    
-  } catch (error) {
-    console.error('Error guardando renta:', error)
-    alert('Hubo un error al guardar renta: ' + error.message)
+
+    alert('Renta guardada correctamente.')
+
+  } catch (err) {
+    rentalError.value =
+      `No se pudo crear la renta: ${err.message}`
   } finally {
     isSavingRental.value = false
   }
 }
 
-const formatDate = (dateStr) => {
-  if (!dateStr) return ''
-  const d = new Date(dateStr)
-  return d.toLocaleDateString()
+// Abrir devolución
+function openReturnModal(rental) {
+  selectedRental.value = rental
+
+  returnForm.value = {
+    condition: 'BUENA',
+    comments: ''
+  }
+
+  returnError.value = ''
+  showReturnModal.value = true
 }
 
-const formatDateTime = (dateStr) => {
-  if (!dateStr) return ''
-  const d = new Date(dateStr)
-  return d.toLocaleString()
-}
+// Procesar devolución
+async function processReturn() {
+  if (
+    !selectedRental.value ||
+    isSavingReturn.value
+  ) return
 
-const isOverdue = (dateStr) => {
-  if (!dateStr) return false
-  const end = new Date(dateStr)
-  end.setHours(23, 59, 59, 999)
-  return new Date() > end
-}
+  isSavingReturn.value = true
+  returnError.value = ''
 
-const getConditionClass = (condition) => {
-  switch (condition) {
-    case 'BUENA': return 'bg-green-100 text-green-800'
-    case 'DAÑADA': return 'bg-yellow-100 text-yellow-800'
-    case 'PERDIDA': return 'bg-red-100 text-red-800'
-    default: return 'bg-gray-100 text-gray-800'
+  try {
+    const { error } = await supabase.rpc(
+      'complete_rental_safe',
+      {
+        p_rental_id: selectedRental.value.id,
+        p_condition: returnForm.value.condition,
+        p_comments: returnForm.value.comments
+      }
+    )
+
+    if (error) throw error
+
+    showReturnModal.value = false
+    selectedRental.value = null
+
+    await fetchData()
+
+    alert('Devolución procesada correctamente.')
+
+  } catch (err) {
+    returnError.value =
+      `No se pudo procesar: ${err.message}`
+  } finally {
+    isSavingReturn.value = false
   }
 }
 
-onMounted(() => {
-  fetchData()
-})
+onMounted(fetchData)
 </script>
