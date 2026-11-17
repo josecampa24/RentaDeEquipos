@@ -95,16 +95,15 @@
 
     <!-- Modal Procesar Devolución -->
     <div v-if="showReturnModal" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6 animate-in fade-in zoom-in duration-200">
+      <div class="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
         <h2 class="text-xl font-bold mb-4 text-gray-800">Procesar Devolución - Renta #{{ selectedRental?.id }}</h2>
         <form @submit.prevent="processReturn" class="space-y-4">
-          
           <div>
             <label class="block text-sm font-medium text-gray-700">Condición del Equipo</label>
             <select v-model="returnForm.condition" required class="mt-1 block w-full rounded border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2 border">
               <option value="BUENA">Buena (Sin daños aparentes)</option>
               <option value="DAÑADA">Dañada (Requiere reparación)</option>
-              <option value="PERDIDA">Perdida / Incompleta</option>
+              <option value="PERDIDA">Perdida / Incompleta (No regresa a stock)</option>
             </select>
           </div>
 
@@ -112,7 +111,7 @@
             <label class="block text-sm font-medium text-gray-700">Comentarios Adicionales</label>
             <textarea v-model="returnForm.comments" rows="3" class="mt-1 block w-full rounded border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2 border" placeholder="Observaciones de la devolución..."></textarea>
           </div>
-          
+
           <div class="flex justify-end space-x-3 mt-6 pt-4 border-t border-gray-100">
             <button type="button" @click="closeReturnModal" class="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded transition-colors">Cancelar</button>
             <button type="submit" :disabled="isSavingReturn" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 transition-colors disabled:opacity-50">
@@ -122,13 +121,12 @@
         </form>
       </div>
     </div>
-    
+
     <!-- Modal Nueva Renta -->
     <div v-if="showNewRentalModal" class="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-      <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 animate-in fade-in zoom-in duration-200 max-h-[90vh] overflow-y-auto">
+      <div class="bg-white rounded-lg shadow-xl w-full max-w-2xl p-6 max-h-[90vh] overflow-y-auto">
         <h2 class="text-xl font-bold mb-4 text-gray-800">Registrar Nueva Renta</h2>
         <form @submit.prevent="saveRental" class="space-y-4">
-          
           <div>
             <label class="block text-sm font-medium text-gray-700">Cliente</label>
             <select v-model="rentalForm.client_id" required class="mt-1 block w-full rounded border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2 border">
@@ -144,33 +142,47 @@
             </div>
             <div>
               <label class="block text-sm font-medium text-gray-700">Fecha de Fin</label>
-              <input type="date" v-model="rentalForm.end_date" required class="mt-1 block w-full rounded border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2 border" />
+              <input type="date" v-model="rentalForm.end_date" :min="rentalForm.start_date" required class="mt-1 block w-full rounded border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2 border" />
             </div>
           </div>
 
           <div class="border-t border-gray-200 pt-4 mt-4">
             <h3 class="text-lg font-medium text-gray-900 mb-2">Equipos</h3>
-            
+
             <div v-for="(item, index) in rentalForm.items" :key="index" class="flex gap-4 mb-2 items-end">
               <div class="flex-1">
                 <label class="block text-xs font-medium text-gray-700">Equipo</label>
                 <select v-model="item.equipment_id" required @change="updateItemPrice(index)" class="mt-1 block w-full rounded border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2 border text-sm">
                   <option value="" disabled>Selecciona equipo</option>
-                  <option v-for="eq in allEquipments" :key="eq.id" :value="eq.id">{{ eq.name }} (${{ eq.dailyPrice }}/día)</option>
+                  <option
+                    v-for="eq in allEquipments"
+                    :key="eq.id"
+                    :value="eq.id"
+                    :disabled="eq.quantity <= 0"
+                  >
+                    {{ eq.name }} (${{ getEquipPrice(eq) }}/día) — Stock: {{ eq.quantity }}
+                  </option>
                 </select>
               </div>
               <div class="w-24">
                 <label class="block text-xs font-medium text-gray-700">Cantidad</label>
-                <input type="number" v-model.number="item.quantity" min="1" required class="mt-1 block w-full rounded border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2 border text-sm" />
+                <input
+                  type="number"
+                  v-model.number="item.quantity"
+                  min="1"
+                  :max="getMaxStock(item.equipment_id)"
+                  required
+                  class="mt-1 block w-full rounded border-gray-300 shadow-sm focus:ring-indigo-500 focus:border-indigo-500 p-2 border text-sm"
+                />
               </div>
               <button type="button" @click="removeItem(index)" class="text-red-500 hover:text-red-700 p-2 mb-1">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
               </button>
             </div>
-            
+
             <button type="button" @click="addItem" class="mt-2 text-sm text-indigo-600 hover:text-indigo-800 font-medium">+ Agregar otro equipo</button>
           </div>
-          
+
           <div class="flex justify-between items-center mt-6 pt-4 border-t border-gray-100">
             <div class="text-lg font-bold text-gray-900">
               Total estimado: ${{ calculatedTotal.toFixed(2) }}
@@ -185,7 +197,6 @@
         </form>
       </div>
     </div>
-
   </div>
 </template>
 
@@ -216,35 +227,83 @@ const rentalForm = ref({
   items: []
 })
 
+const getEquipPrice = (eq) => Number(eq?.dailyPrice ?? eq?.daily_price ?? 0)
+
+const getMaxStock = (equipmentId) => {
+  const eq = allEquipments.value.find(e => e.id === equipmentId)
+  return eq ? Math.max(1, eq.quantity) : 999
+}
+
 const fetchData = async () => {
   try {
-    // Fetch rentas activas
+    const [{ data: cData }, { data: eData }] = await Promise.all([
+      supabase.from('clients').select('*'),
+      supabase.from('equipments').select('*')
+    ])
+
+    allClients.value = cData || []
+    allEquipments.value = eData || []
+
+    // Rentas activas (con respaldo si PostgREST no tiene FK configuradas)
     const { data: rentals, error: rentalsError } = await supabase
       .from('rentals')
       .select('*, clients(name), rental_items(*, equipments(name))')
       .eq('status', 'CONFIRMADA')
       .order('end_date', { ascending: true })
-      
-    if (rentalsError) console.error('Error fetching rentals:', rentalsError)
-    if (rentals) pendingRentals.value = rentals
-    
-    // Fetch returns history nested info
+
+    if (!rentalsError && rentals) {
+      pendingRentals.value = rentals
+    } else {
+      const [{ data: rawRentals }, { data: rawItems }] = await Promise.all([
+        supabase.from('rentals').select('*').eq('status', 'CONFIRMADA').order('end_date', { ascending: true }),
+        supabase.from('rental_items').select('*')
+      ])
+      pendingRentals.value = (rawRentals || []).map(r => ({
+        ...r,
+        clients: allClients.value.find(c => c.id === r.client_id) || null,
+        rental_items: (rawItems || [])
+          .filter(ri => ri.rental_id === r.id)
+          .map(ri => ({
+            ...ri,
+            equipments: allEquipments.value.find(eq => eq.id === ri.equipment_id) || null
+          }))
+      }))
+    }
+
+    // Historial de devoluciones (con respaldo)
     const { data: returns, error: returnsError } = await supabase
       .from('returns')
       .select('*, rentals(*, clients(name), rental_items(*, equipments(name)))')
       .order('return_date', { ascending: false })
       .limit(10)
-      
-    if (returnsError) console.error('Error fetching returns:', returnsError)
-    if (returns) recentReturns.value = returns
-      
-    // Fetch para el modal de nueva renta
-    const { data: cData } = await supabase.from('clients').select('*')
-    if (cData) allClients.value = cData
-    
-    const { data: eData } = await supabase.from('equipments').select('*')
-    if (eData) allEquipments.value = eData
-      
+
+    if (!returnsError && returns) {
+      recentReturns.value = returns
+    } else {
+      const [{ data: rawReturns }, { data: allRentals }, { data: rawItems }] = await Promise.all([
+        supabase.from('returns').select('*').order('return_date', { ascending: false }).limit(10),
+        supabase.from('rentals').select('*'),
+        supabase.from('rental_items').select('*')
+      ])
+      recentReturns.value = (rawReturns || []).map(ret => {
+        const rental = (allRentals || []).find(r => r.id === ret.rental_id)
+        return {
+          ...ret,
+          rentals: rental
+            ? {
+                ...rental,
+                clients: allClients.value.find(c => c.id === rental.client_id) || null,
+                rental_items: (rawItems || [])
+                  .filter(ri => ri.rental_id === rental.id)
+                  .map(ri => ({
+                    ...ri,
+                    equipments: allEquipments.value.find(eq => eq.id === ri.equipment_id) || null
+                  }))
+              }
+            : null
+        }
+      })
+    }
   } catch (error) {
     console.error('Error fetching return data:', error)
   }
@@ -265,7 +324,7 @@ const closeReturnModal = () => {
 const processReturn = async () => {
   if (!selectedRental.value) return
   isSavingReturn.value = true
-  
+
   try {
     const { error: returnError } = await supabase.from('returns').insert([{
       rental_id: selectedRental.value.id,
@@ -273,28 +332,36 @@ const processReturn = async () => {
       condition: returnForm.value.condition,
       comments: returnForm.value.comments
     }])
-    
+
     if (returnError) throw returnError
-    
+
     const { error: updateError } = await supabase
       .from('rentals')
       .update({ status: 'COMPLETADA' })
       .eq('id', selectedRental.value.id)
-      
+
     if (updateError) throw updateError
-    
-    if (selectedRental.value.rental_items) {
+
+    // Solo devolver stock si el equipo no fue reportado como PERDIDA
+    if (returnForm.value.condition !== 'PERDIDA' && selectedRental.value.rental_items) {
       for (const item of selectedRental.value.rental_items) {
-        const { data: eqData } = await supabase.from('equipments').select('quantity').eq('id', item.equipment_id).single()
+        const { data: eqData } = await supabase
+          .from('equipments')
+          .select('quantity')
+          .eq('id', item.equipment_id)
+          .single()
+
         if (eqData) {
-          await supabase.from('equipments').update({ quantity: eqData.quantity + item.quantity }).eq('id', item.equipment_id)
+          await supabase
+            .from('equipments')
+            .update({ quantity: eqData.quantity + item.quantity })
+            .eq('id', item.equipment_id)
         }
       }
     }
-    
+
     await fetchData()
     closeReturnModal()
-    
   } catch (error) {
     console.error('Error procesando devolución:', error)
     alert('Hubo un error al procesar: ' + error.message)
@@ -305,10 +372,17 @@ const processReturn = async () => {
 
 // Lógica de Nueva Renta
 const openNewRentalModal = () => {
+  const today = new Date()
+  const tomorrow = new Date(today)
+  tomorrow.setDate(today.getDate() + 1)
+
+  const toLocalISO = (d) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
   rentalForm.value = {
     client_id: '',
-    start_date: new Date().toISOString().split('T')[0],
-    end_date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
+    start_date: toLocalISO(today),
+    end_date: toLocalISO(tomorrow),
     items: [{ equipment_id: '', quantity: 1, price: 0 }]
   }
   showNewRentalModal.value = true
@@ -330,57 +404,84 @@ const updateItemPrice = (index) => {
   const item = rentalForm.value.items[index]
   const eq = allEquipments.value.find(e => e.id === item.equipment_id)
   if (eq) {
-    item.price = eq.dailyPrice
+    item.price = getEquipPrice(eq)
+    if (item.quantity > eq.quantity) {
+      item.quantity = Math.max(1, eq.quantity)
+    }
   }
 }
 
 const calculatedTotal = computed(() => {
   if (!rentalForm.value.start_date || !rentalForm.value.end_date) return 0
-  const start = new Date(rentalForm.value.start_date)
-  const end = new Date(rentalForm.value.end_date)
-  const diffTime = Math.abs(end - start)
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1
-  
-  let itemsTotal = rentalForm.value.items.reduce((total, item) => total + (item.price * item.quantity), 0)
+  const start = new Date(`${rentalForm.value.start_date}T00:00:00`)
+  const end = new Date(`${rentalForm.value.end_date}T00:00:00`)
+  if (end < start) return 0
+
+  const diffDays = Math.round((end - start) / (1000 * 60 * 60 * 24)) || 1
+  const itemsTotal = rentalForm.value.items.reduce(
+    (total, item) => total + (Number(item.price) || 0) * (Number(item.quantity) || 0),
+    0
+  )
   return itemsTotal * diffDays
 })
 
 const saveRental = async () => {
+  if (rentalForm.value.end_date < rentalForm.value.start_date) {
+    alert('La fecha de fin no puede ser anterior a la fecha de inicio.')
+    return
+  }
+
+  // Validar stock acumulado por equipo
+  const requestedByEq = {}
+  for (const item of rentalForm.value.items) {
+    requestedByEq[item.equipment_id] = (requestedByEq[item.equipment_id] || 0) + item.quantity
+  }
+
+  for (const [eqId, totalQty] of Object.entries(requestedByEq)) {
+    const eq = allEquipments.value.find(e => String(e.id) === String(eqId))
+    if (!eq || totalQty > eq.quantity) {
+      alert(`Stock insuficiente para "${eq?.name || 'el equipo seleccionado'}". Disponible: ${eq?.quantity ?? 0}.`)
+      return
+    }
+  }
+
   isSavingRental.value = true
   try {
-    const { data: rentalData, error: rentalError } = await supabase.from('rentals').insert([{
-      client_id: rentalForm.value.client_id,
-      start_date: rentalForm.value.start_date,
-      end_date: rentalForm.value.end_date,
-      total_price: calculatedTotal.value,
-      status: 'CONFIRMADA'
-    }]).select()
-    
+    const { data: rentalData, error: rentalError } = await supabase
+      .from('rentals')
+      .insert([{
+        client_id: rentalForm.value.client_id,
+        start_date: rentalForm.value.start_date,
+        end_date: rentalForm.value.end_date,
+        total_price: calculatedTotal.value,
+        status: 'CONFIRMADA'
+      }])
+      .select()
+
     if (rentalError) throw rentalError
-    
+
     const rentalId = rentalData[0].id
-    
+
     const itemsToInsert = rentalForm.value.items.map(item => ({
       rental_id: rentalId,
       equipment_id: item.equipment_id,
       quantity: item.quantity,
       price: item.price
     }))
-    
+
     const { error: itemsError } = await supabase.from('rental_items').insert(itemsToInsert)
     if (itemsError) throw itemsError
-    
-    for (const item of rentalForm.value.items) {
-      const eq = allEquipments.value.find(e => e.id === item.equipment_id)
+
+    for (const [eqId, totalQty] of Object.entries(requestedByEq)) {
+      const eq = allEquipments.value.find(e => String(e.id) === String(eqId))
       if (eq) {
-        const newQuantity = Math.max(0, eq.quantity - item.quantity)
+        const newQuantity = Math.max(0, eq.quantity - totalQty)
         await supabase.from('equipments').update({ quantity: newQuantity }).eq('id', eq.id)
       }
     }
-    
+
     await fetchData()
     closeNewRentalModal()
-    
   } catch (error) {
     console.error('Error guardando renta:', error)
     alert('Hubo un error al guardar renta: ' + error.message)
@@ -391,20 +492,19 @@ const saveRental = async () => {
 
 const formatDate = (dateStr) => {
   if (!dateStr) return ''
-  const d = new Date(dateStr)
-  return d.toLocaleDateString()
+  const cleanDate = dateStr.split('T')[0]
+  return new Date(`${cleanDate}T00:00:00`).toLocaleDateString()
 }
 
 const formatDateTime = (dateStr) => {
   if (!dateStr) return ''
-  const d = new Date(dateStr)
-  return d.toLocaleString()
+  return new Date(dateStr).toLocaleString()
 }
 
 const isOverdue = (dateStr) => {
   if (!dateStr) return false
-  const end = new Date(dateStr)
-  end.setHours(23, 59, 59, 999)
+  const cleanDate = dateStr.split('T')[0]
+  const end = new Date(`${cleanDate}T23:59:59.999`)
   return new Date() > end
 }
 
